@@ -9,7 +9,7 @@ from telegram.ext import (
     filters,
     ContextTypes
 )
-import google.generativeai as genaio
+import google.generativeai as genai
 
 # 从环境变量读取配置，安全不泄露
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
