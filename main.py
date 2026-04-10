@@ -9,14 +9,14 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID")
 
-# 这里填写你的群链接（自己修改）
-GROUP_LINK = "https://t.me/hwjljl"
+# 你的群链接（记得改成你自己的）
+GROUP_LINK = "https://t.me/你的群链接"
 
 # ===================================================
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")  # 已换成最新可用模型
 
 # /start 命令
 def start(update: Update, context: CallbackContext):
@@ -26,7 +26,6 @@ def start(update: Update, context: CallbackContext):
         if member.status in ["member", "administrator", "creator"]:
             update.message.reply_text("✅ 机器人已启动，直接发消息即可对话！")
         else:
-            # 没加群 → 提示+群链接
             update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
     except:
         update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
@@ -41,14 +40,11 @@ def reply_message(update: Update, context: CallbackContext):
         return
 
     try:
-        # 检查是否在群里
         member = context.bot.get_chat_member(chat_id=REQUIRED_GROUP_ID, user_id=user_id)
         if member.status not in ["member", "administrator", "creator"]:
-            # 没加群 → 回复提示
             update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
             return
     except:
-        # 异常也按未加群处理
         update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
         return
 
