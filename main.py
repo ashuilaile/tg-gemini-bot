@@ -6,14 +6,14 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import google.generativeai as genai
 
-# ===================== 已帮你全部填好 =====================
+# ===================== 【环境变量】全部从这里读取 =====================
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY")
-DEEPSEEK_API_KEY   = "sk-af1897739dff407eb26efd68d7128c64"
-SILICONFLOW_API_KEY = "sk-yydbwypqevncmceynwjgnwgdpezpizkqepiziseozgaijnhv"
-REQUIRED_GROUP_ID  = os.getenv("REQUIRED_GROUP_ID")
-GROUP_LINK         = "https://t.me/HWJLJL"
-# ==========================================================
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
+REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID")
+GROUP_LINK = "https://t.me/HWJLJL"
+# ====================================================================
 
 # 1. Gemini
 def ask_gemini(prompt):
@@ -62,7 +62,7 @@ def ask_siliconflow(prompt):
     except:
         return None
 
-# 自动轮询 AI
+# 自动轮询可用 AI
 def get_ai_reply(prompt):
     ais = [ask_gemini, ask_deepseek, ask_siliconflow]
     random.shuffle(ais)
@@ -74,13 +74,12 @@ def get_ai_reply(prompt):
 
     return "⚠️ 机器人繁忙，请1分钟后再试~"
 
-# ==========================================================
-
+# ===================== 机器人逻辑 =====================
 def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     try:
         mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
-        if mem.status in ["member","administrator","creator"]:
+        if mem.status in ["member", "administrator", "creator"]:
             update.message.reply_text("✅ 机器人已启动，直接发消息即可对话！")
         else:
             update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
@@ -94,7 +93,7 @@ def reply_message(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     try:
         mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
-        if mem.status not in ["member","administrator","creator"]:
+        if mem.status not in ["member", "administrator", "creator"]:
             update.message.reply_text(f"❌ 请先加入群组后再使用机器人！\n群链接：{GROUP_LINK}")
             return
     except:
@@ -108,8 +107,7 @@ def reply_message(update: Update, context: CallbackContext):
     reply = get_ai_reply(text)
     update.message.reply_text(reply)
 
-# ==========================================================
-
+# 启动
 def main():
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
