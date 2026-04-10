@@ -10,13 +10,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID")
 
 # 你的群链接（记得改成你自己的）
-GROUP_LINK = "https://t.me/你的群链接"
+GROUP_LINK = "https://t.me/hwjljl"
 
 # ===================================================
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")  # 已换成最新可用模型
+model = genai.GenerativeModel("gemini-2.0-flash-lite")  # 更稳、额度更高
 
 # /start 命令
 def start(update: Update, context: CallbackContext):
@@ -57,7 +57,7 @@ def reply_message(update: Update, context: CallbackContext):
         response = model.generate_content(user_text)
         reply = response.text
     except Exception as e:
-        reply = f"❌ 出错：{str(e)}"
+        reply = f"⚠️ 机器人繁忙，请30秒后再试~"
 
     update.message.reply_text(reply)
 
