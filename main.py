@@ -6,38 +6,42 @@ from telegram import Update, File
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 from io import BytesIO
 
-# ===================== 【全部环境变量】 =====================
+# ===================== 环境变量 =====================
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
-OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY")  # <-- 你新注册的OCR放这里
+OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY")
 REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID")
 GROUP_LINK = "https://t.me/HWJLJL"
-# ============================================================
+# ====================================================
 
-# ---------------------- 免费 OCR 图片识别 ----------------------
+# ---------------------- OCR 修复版 ----------------------
 def ocr_image(image_bytes: bytes) -> str:
     try:
         url = "https://api.ocr.space/parse/image"
         data = {
             "apikey": OCR_SPACE_API_KEY,
-            "language": "chs",  # 简体中文
-            "isOverlayRequired": False
+            "language": "chs",
+            "filetype": "JPG",
+            "detectOrientation": True,
+            "scale": True
         }
         files = {
-            "file": ("image.jpg", image_bytes, "image/jpeg")
+            "filename": ("image.jpg", image_bytes, "image/jpeg")
         }
-        res = requests.post(url, data=data, files=files, timeout=15)
-        data = res.json()
+        res = requests.post(url, data=data, files=files, timeout=20)
+        rj = res.json()
 
-        if not data.get("IsErrored", True):
-            return data["ParsedResults"][0]["ParsedText"].strip()
-        return "❌ 无法识别图片文字"
-    except:
-        return "❌ 图片识别失败"
+        if rj.get("ParsedResults") and len(rj["ParsedResults"]) > 0:
+            txt = rj["ParsedResults"][0]["ParsedText"].strip()
+            if txt:
+                return txt
+        return "未识别到文字"
+    except Exception as e:
+        return "未识别到文字"
 
-# ---------------------- AI 接口 ----------------------
+# ---------------------- AI ----------------------
 def ask_gemini(prompt):
     try:
         import google.generativeai as genai
@@ -65,7 +69,6 @@ def ask_siliconflow(prompt):
     except:
         return None
 
-# 自动轮询可用AI
 def get_ai_reply(prompt):
     ais = [ask_gemini, ask_deepseek, ask_siliconflow]
     random.shuffle(ais)
@@ -73,7 +76,7 @@ def get_ai_reply(prompt):
         res = func(prompt)
         if res:
             return res
-    return "⚠️ 机器人繁忙，请稍后再试~"
+    return "⚠️ 繁忙，请稍后再试"
 
 # ---------------------- 机器人逻辑 ----------------------
 def start(update: Update, context: CallbackContext):
@@ -81,11 +84,11 @@ def start(update: Update, context: CallbackContext):
     try:
         mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
         if mem.status in ["member", "administrator", "creator"]:
-            update.message.reply_text("✅ 机器人已启动！支持文字 + 图片")
+            update.message.reply_text("✅ 机器人已启动，支持文字、图片")
         else:
-            update.message.reply_text(f"❌ 请先加群再使用\n{GROUP_LINK}")
+            update.message.reply_text(f"❌ 请先加群\n{GROUP_LINK}")
     except:
-        update.message.reply_text(f"❌ 请先加群再使用\n{GROUP_LINK}")
+        update.message.reply_text(f"❌ 请先加群\n{GROUP_LINK}")
 
 def reply_message(update: Update, context: CallbackContext):
     if update.effective_chat.type != "private":
@@ -95,34 +98,36 @@ def reply_message(update: Update, context: CallbackContext):
     try:
         mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
         if mem.status not in ["member", "administrator", "creator"]:
-            update.message.reply_text(f"❌ 请先加群再使用\n{GROUP_LINK}")
+            update.message.reply_text(f"❌ 请先加群\n{GROUP_LINK}")
             return
     except:
-        update.message.reply_text(f"❌ 请先加群再使用\n{GROUP_LINK}")
+        update.message.reply_text(f"❌ 请先加群\n{GROUP_LINK}")
         return
 
-    # ---------------------- 处理图片 ----------------------
+    # 图片处理
     if update.message.photo:
         photo = update.message.photo[-1]
-        file: File = context.bot.get_file(photo.file_id)
+        file = context.bot.get_file(photo.file_id)
         bio = BytesIO()
         file.download(out=bio)
         bio.seek(0)
-        
-        # OCR识别
+
         img_text = ocr_image(bio.read())
-        user_prompt = update.message.caption or "请解析这段图片文字"
-        full_prompt = f"图片文字内容：{img_text}\n用户需求：{user_prompt}"
-        
+        caption = update.message.caption or "解析这段内容"
+
+        if img_text == "未识别到文字":
+            update.message.reply_text("🖼️ 图片中未识别到可读取的文字")
+            return
+
+        full_prompt = f"图片内容：{img_text}\n用户问题：{caption}"
         ai_reply = get_ai_reply(full_prompt)
-        update.message.reply_text(f"🖼️ OCR识别结果：\n{img_text}\n\n🤖 AI回复：\n{ai_reply}")
+        update.message.reply_text(f"🖼️ 识别结果：\n{img_text}\n\n🤖 {ai_reply}")
         return
 
-    # ---------------------- 处理文字 ----------------------
+    # 文字处理
     text = update.message.text
-    if not text:
-        return
-    update.message.reply_text(get_ai_reply(text))
+    if text:
+        update.message.reply_text(get_ai_reply(text))
 
 # ---------------------- 启动 ----------------------
 def main():
