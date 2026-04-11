@@ -1,14 +1,18 @@
 import os
+import random
 import requests
+import telegram
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# ===================== 环境变量 =====================
+# ===================== 环境变量（无OCR） =====================
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
-# =====================================================
+REQUIRED_GROUP_ID = os.getenv("REQUIRED_GROUP_ID")
+GROUP_LINK = "https://t.me/HWJLJL"
+# ============================================================
 
 # ---------------------- AI 接口（纯文字） ----------------------
 def ask_gemini(prompt):
@@ -42,36 +46,61 @@ def ask_siliconflow(prompt):
         return None
 
 def get_ai_reply(prompt):
-    """轮询多个AI接口，确保成功"""
     ais = [ask_gemini, ask_deepseek, ask_siliconflow]
     random.shuffle(ais)
     for func in ais:
         res = func(prompt)
         if res:
             return res
-    return "⚠️ 所有AI接口暂时繁忙，请稍后再试~"
+    return "⚠️ 所有接口繁忙，请稍后再试~"
 
-# ---------------------- 命令处理 ----------------------
+# ---------------------- 机器人逻辑 ----------------------
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("✅ 机器人已启动！现在可以直接发送文字提问~")
+    user_id = update.effective_user.id
+    try:
+        mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
+        if mem.status in ["member", "administrator", "creator"]:
+            update.message.reply_text("✅ 机器人已启动！发送文字即可对话")
+        else:
+            update.message.reply_text(f"❌ 请先加入群组再使用\n{GROUP_LINK}")
+    except Exception as e:
+        print(f"Start Error: {str(e)}")
+        update.message.reply_text(f"❌ 请先加入群组再使用\n{GROUP_LINK}")
 
-def handle_text(update: Update, context: CallbackContext):
-    """只处理文字消息，完全不处理图片/文件"""
-    user_text = update.message.text
-    ai_reply = get_ai_reply(user_text)
-    update.message.reply_text(ai_reply)
+def reply_message(update: Update, context: CallbackContext):
+    if update.effective_chat.type != "private":
+        return
 
-# ---------------------- 主函数 ----------------------
+    user_id = update.effective_user.id
+    try:
+        mem = context.bot.get_chat_member(REQUIRED_GROUP_ID, user_id)
+        if mem.status not in ["member", "administrator", "creator"]:
+            update.message.reply_text(f"❌ 请先加入群组再使用\n{GROUP_LINK}")
+            return
+    except Exception as e:
+        print(f"Auth Error: {str(e)}")
+        update.message.reply_text(f"❌ 请先加入群组再使用\n{GROUP_LINK}")
+        return
+
+    # 收到图片直接提示
+    if update.message.photo:
+        update.message.reply_text("🖼️ 图片功能暂未开放，仅支持文字对话~")
+        return
+
+    text = update.message.text
+    if not text:
+        return
+    
+    update.message.reply_text(get_ai_reply(text))
+
+# ---------------------- 启动 ----------------------
 def main():
-    updater = Updater(TELEGRAM_BOT_TOKEN)
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
-
-    # 只监听文字消息，完全不监听图片/文件
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
-
+    dp.add_handler(MessageHandler(Filters.all & ~Filters.command, reply_message))
     updater.start_polling()
     updater.idle()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
